@@ -14,3 +14,4 @@ do
 done &
 echo "Heart rate monitoring process started with PID: $!"
 
+ddfevdbf
