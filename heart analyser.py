@@ -1,84 +1,52 @@
-import random
-import time
+#!/usr/bin/env python3
+import argparse, time, csv, os
+from statistics import mean
 
-# -------------------------------
-# Heart Rate Detector Program
-# -------------------------------
+MIN_HR = 60
+MAX_HR = 100
 
-# Define safe range (you can adjust these numbers)
-MIN_HEART_RATE = 60  # too low if less than this
-MAX_HEART_RATE = 100  # too high if more than this
+def read_last_n(path, n=60):
+    if not os.path.exists(path): return []
+    with open(path, newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    return rows[-n:]
 
-# This will keep a history of readings
-heart_rate_log = []
-
-
-def get_heart_rate():
-    """
-    Fake heart rate sensor.
-    In real life this would connect to hardware.
-    Here we just simulate a random number.
-    """
-    return random.randint(40, 130)
-
-
-def check_heart_rate(rate):
-    """
-    Check if the heart rate is safe, too low, or too high.
-    """
-    if rate < MIN_HEART_RATE:
-        return "⚠️ Warning: Heart rate too LOW!"
-    elif rate > MAX_HEART_RATE:
-        return "⚠️ Warning: Heart rate too HIGH!"
-    else:
-        return "✅ Heart rate is normal."
-
-
-def display_summary():
-    """
-    Show the average, highest, and lowest heart rates recorded.
-    """
-    if len(heart_rate_log) == 0:
-        print("No heart rate data recorded yet.")
-        return
-
-    avg_rate = sum(heart_rate_log) / len(heart_rate_log)
-    highest = max(heart_rate_log)
-    lowest = min(heart_rate_log)
-
-    print("\n--- Session Summary ---")
-    print(f"Readings taken: {len(heart_rate_log)}")
-    print(f"Average heart rate: {avg_rate:.1f} bpm")
-    print(f"Highest recorded: {highest} bpm")
-    print(f"Lowest recorded: {lowest} bpm")
-    print("------------------------\n")
-
+def classify(hr):
+    hr = int(hr)
+    if hr < MIN_HR: return "LOW"
+    if hr > MAX_HR: return "HIGH"
+    return "NORMAL"
 
 def main():
-    print("🫀 Heart Rate Detector Started")
-    print("Press Ctrl+C to stop.\n")
+    ap = argparse.ArgumentParser(description="Analyse latest heart rate readings.")
+    ap.add_argument("--log", default="heart_rate_log.csv")
+    ap.add_argument("--window", type=int, default=60, help="number of recent rows to analyse")
+    ap.add_argument("--watch", action="store_true", help="stream updates")
+    args = ap.parse_args()
 
-    try:
-        while True:
-            # Get simulated heart rate
-            current_rate = get_heart_rate()
+    def once():
+        rows = read_last_n(args.log, args.window)
+        if not rows:
+            print("No data yet.")
+            return
+        vals = [int(r["heart_rate"]) for r in rows if r.get("heart_rate")]
+        if not vals:
+            print("No numeric values found.")
+            return
+        avg, lo, hi = mean(vals), min(vals), max(vals)
+        state = classify(vals[-1])
+        print(f"Readings: {len(vals)}  avg={avg:.1f}  min={lo}  max={hi}  latest={vals[-1]}({state})")
 
-            # Save it to history
-            heart_rate_log.append(current_rate)
+    if args.watch:
+        try:
+            while True:
+                once()
+                time.sleep(2.0)
+        except KeyboardInterrupt:
+            print("\nstopped.")
+    else:
+        once()
 
-            # Print result
-            print(f"Current heart rate: {current_rate} bpm")
-            message = check_heart_rate(current_rate)
-            print(message)
-
-            # Small pause before next reading
-            time.sleep(1.5)
-
-    except KeyboardInterrupt:
-        print("\n\nProgram stopped by user.")
-        display_summary()
-
-
-# Run the program
 if __name__ == "__main__":
+    main()
     main()
